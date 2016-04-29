@@ -24,5 +24,5 @@ test: test.o
 %.o: %.c
 	gcc -c $< -o $@
 clean:
-	rm -f $(PROG_NAME) *.h *.o *.so *.a
+	rm -f $(PROG_NAME) lib$(PROG_NAME).* test
 

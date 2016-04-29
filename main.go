@@ -1,10 +1,23 @@
 package main
 
 import (
-	"C"
+	"bufio"
 	"fmt"
+	"net"
+	"os"
 
 	"github.com/alecthomas/kingpin"
+	"github.com/google/shlex"
+)
+
+var (
+	UNIX_SOCKET = "/dev/socket/su_daemon"
+	socket      net.Listener
+	kmsg        *bufio.Writer
+)
+
+const (
+	TAG = "su_daemon"
 )
 
 type nargs []string
@@ -48,6 +61,37 @@ func debug(a ...interface{}) {
 	}
 }
 
+func SliceIt(args string) (ret []string) {
+	ret, _ = shlex.Split(args)
+	return
+}
+
+func init() {
+	var err error
+	socket, err = net.Listen("unix", UNIX_SOCKET)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to bind to socket: %v", err)
+		os.Exit(-1)
+	}
+	if err = os.Chmod(UNIX_SOCKET, 0666); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to chmod the socket: %v", err)
+		os.Exit(-1)
+	}
+
+	kmsg_file, err := os.OpenFile("/dev/kmsg", os.O_WRONLY, 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to open /dev/kmsg")
+		os.Exit(-1)
+	}
+	kmsg = bufio.NewWriter(kmsg_file)
+}
+
+//export Main1
+func Main1(command string) (ret int) {
+	args := SliceIt(command)
+	return Main(args)
+}
+
 func Main(args []string) (ret int) {
 	switch kingpin.MustParse(app.Parse(args[1:])) {
 	case write_cmd.FullCommand():
@@ -60,6 +104,37 @@ func Main(args []string) (ret int) {
 	return
 }
 
+func log(msg ...interface{}) {
+	kmsg.Write([]byte(fmt.Sprintf("%v: %v\n", TAG, msg)))
+	kmsg.Flush()
+}
+
+func process(fd net.Conn) {
+	buf := make([]byte, 512)
+	nr, err := fd.Read(buf)
+	if err != nil {
+		return
+	}
+
+	cmd_bytes := buf[0:nr]
+	cmd := string(cmd_bytes)
+	log("Command: %s", cmd)
+	Main1(cmd)
+}
+
+func server() {
+	for {
+		fd, err := socket.Accept()
+		log("Received connection")
+		if err != nil {
+			log("Failed to accept socket")
+			continue
+		}
+		process(fd)
+		fd.Close()
+	}
+}
+
 func main() {
-	// unused
+	server()
 }

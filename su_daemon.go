@@ -1,13 +1,11 @@
 package main
 
 import (
-	"C"
 	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 )
-import "github.com/google/shlex"
 
 //export Write
 func Write(data, file string) (ret int) {
@@ -50,9 +48,4 @@ func Execv(cmd string, args []string, show_output bool) (ret int) {
 //export Execv1
 func Execv1(cmd string, args string, show_output bool) (ret int) {
 	return Execv(cmd, SliceIt(args), show_output)
-}
-
-func SliceIt(args string) (ret []string) {
-	ret, _ = shlex.Split(args)
-	return
 }
