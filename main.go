@@ -1,8 +1,8 @@
 package main
 
 import (
+	"C"
 	"fmt"
-	"os"
 
 	"github.com/alecthomas/kingpin"
 )
@@ -48,6 +48,18 @@ func debug(a ...interface{}) {
 	}
 }
 
+func Main(args []string) (ret int) {
+	switch kingpin.MustParse(app.Parse(args[1:])) {
+	case write_cmd.FullCommand():
+		debug("write %s %s", write_data, write_file)
+		ret = Write(*write_data, *write_file)
+	case exec_cmd.FullCommand():
+		debug("exec %s %s", exec_cmd_bin, exec_cmd_args)
+		ret = Execv(*exec_cmd_bin, *exec_cmd_args, *output)
+	}
+	return
+}
+
 func main() {
-	Main(os.Args)
+	// unused
 }

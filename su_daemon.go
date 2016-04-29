@@ -1,15 +1,16 @@
 package main
 
 import (
+	"C"
 	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
-
-	"github.com/alecthomas/kingpin"
 )
+import "github.com/google/shlex"
 
-func write(data, file string) (ret int) {
+//export Write
+func Write(data, file string) (ret int) {
 	var f_raw *os.File
 	var err error
 
@@ -31,7 +32,8 @@ func write(data, file string) (ret int) {
 	return
 }
 
-func execv(cmd string, args []string, show_output bool) (ret int) {
+//export Execv
+func Execv(cmd string, args []string, show_output bool) (ret int) {
 	if output, err := exec.Command(cmd, args...).Output(); err != nil {
 		if show_output {
 			fmt.Fprintln(os.Stderr, err)
@@ -45,14 +47,12 @@ func execv(cmd string, args []string, show_output bool) (ret int) {
 	return
 }
 
-func Main(args []string) (ret int) {
-	switch kingpin.MustParse(app.Parse(args[1:])) {
-	case write_cmd.FullCommand():
-		debug("write %s %s", write_data, write_file)
-		ret = write(*write_data, *write_file)
-	case exec_cmd.FullCommand():
-		debug("exec %s %s", exec_cmd_bin, exec_cmd_args)
-		ret = execv(*exec_cmd_bin, *exec_cmd_args, *output)
-	}
+//export Execv1
+func Execv1(cmd string, args string, show_output bool) (ret int) {
+	return Execv(cmd, SliceIt(args), show_output)
+}
+
+func SliceIt(args string) (ret []string) {
+	ret, _ = shlex.Split(args)
 	return
 }

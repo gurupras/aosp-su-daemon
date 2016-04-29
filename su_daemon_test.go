@@ -24,6 +24,7 @@ func TestWrite(t *testing.T) {
 			success = false
 		}
 	}
+	testing_base.HandleResult(t, success, result)
 
 	// Out write function cannot create new files. So test this out.
 	result = testing_base.InitResult("TestWrite-2")
@@ -54,6 +55,8 @@ func TestExec(t *testing.T) {
 			success = false
 		}
 	}
+	testing_base.HandleResult(t, success, result)
+
 	result = testing_base.InitResult("TestExec-2")
 	if args, err = (shlex.Split("su_daemon exec programmustnotexist -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
