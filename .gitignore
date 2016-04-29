@@ -1,0 +1,5 @@
+/aosp_su_daemon
+/test
+.*.sw*
+
+!.gitignore
