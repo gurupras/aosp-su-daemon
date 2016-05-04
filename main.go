@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	UNIX_SOCKET = "/dev/socket/su_daemon"
-	socket      net.Listener
-	kmsg        *bufio.Writer
+	UnixSocketPath = "/dev/socket/su_daemon"
+	LogPath        = "/dev/kmsg"
+	socket         net.Listener
+	log_buf        *bufio.Writer
 )
 
 const (
@@ -66,47 +67,58 @@ func SliceIt(args string) (ret []string) {
 	return
 }
 
-func init() {
+func init_fn() {
 	var err error
-	socket, err = net.Listen("unix", UNIX_SOCKET)
+	if socket != nil {
+		goto log
+	}
+	socket, err = net.Listen("unix", UnixSocketPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to bind to socket: %v", err)
+		fmt.Fprintln(os.Stderr, "Failed to bind to socket:", err)
 		os.Exit(-1)
 	}
-	if err = os.Chmod(UNIX_SOCKET, 0666); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to chmod the socket: %v", err)
+	if err = os.Chmod(UnixSocketPath, 0666); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to chmod the socket:", err)
 		os.Exit(-1)
 	}
-
-	kmsg_file, err := os.OpenFile("/dev/kmsg", os.O_WRONLY, 0)
+log:
+	if log_buf != nil {
+		return
+	}
+	log_file, err := os.OpenFile(LogPath, os.O_WRONLY, 0)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to open /dev/kmsg")
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to open:", LogPath))
 		os.Exit(-1)
 	}
-	kmsg = bufio.NewWriter(kmsg_file)
+	log_buf = bufio.NewWriter(log_file)
 }
 
 //export Main1
-func Main1(command string) (ret int) {
+func Main1(command string) (ret int, stdout string, stderr string) {
 	args := SliceIt(command)
 	return Main(args)
 }
 
-func Main(args []string) (ret int) {
+func Main(args []string) (ret int, stdout string, stderr string) {
+	init_fn()
 	switch kingpin.MustParse(app.Parse(args[1:])) {
 	case write_cmd.FullCommand():
 		debug("write %s %s", write_data, write_file)
 		ret = Write(*write_data, *write_file)
 	case exec_cmd.FullCommand():
-		debug("exec %s %s", exec_cmd_bin, exec_cmd_args)
-		ret = Execv(*exec_cmd_bin, *exec_cmd_args, *output)
+		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
+		ret, stdout, stderr = Execv(*exec_cmd_bin, *exec_cmd_args)
+	}
+	if *output {
+		log(stdout)
+		log(stderr)
 	}
 	return
 }
 
 func log(msg ...interface{}) {
-	kmsg.Write([]byte(fmt.Sprintf("%v: %v\n", TAG, msg)))
-	kmsg.Flush()
+	log_buf.Write([]byte(fmt.Sprintf("%v: %v\n", TAG, msg)))
+	log_buf.Flush()
 }
 
 func process(fd net.Conn) {
@@ -136,5 +148,6 @@ func server() {
 }
 
 func main() {
+	init_fn()
 	server()
 }

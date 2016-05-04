@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -31,21 +32,26 @@ func Write(data, file string) (ret int) {
 }
 
 //export Execv
-func Execv(cmd string, args []string, show_output bool) (ret int) {
-	if output, err := exec.Command(cmd, args...).Output(); err != nil {
-		if show_output {
-			fmt.Fprintln(os.Stderr, err)
-		}
+func Execv(cmd string, args []string) (ret int, stdout string, stderr string) {
+	var buf_stdout, buf_stderr bytes.Buffer
+	var err error
+	var command *exec.Cmd
+
+	command = exec.Command(cmd, args...)
+
+	command.Stdout = &buf_stdout
+	command.Stderr = &buf_stderr
+	if err = command.Run(); err != nil {
 		ret = -1
 	} else {
-		if show_output {
-			fmt.Printf("%s", output)
-		}
+		ret = 0
 	}
+	stdout = buf_stdout.String()
+	stderr = buf_stderr.String()
 	return
 }
 
 //export Execv1
-func Execv1(cmd string, args string, show_output bool) (ret int) {
-	return Execv(cmd, SliceIt(args), show_output)
+func Execv1(cmd string, args string) (ret int, stdout string, stderr string) {
+	return Execv(cmd, SliceIt(args))
 }
