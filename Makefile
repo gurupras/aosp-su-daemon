@@ -21,6 +21,13 @@ static:
 test: test.o
 	gcc -static -o test $< $(LDFLAGS) -laosp_su_daemon -lpthread
 
+phone: GOARCH=arm
+phone:
+	go build
+	cd client && go build
+	adb push aosp_su_daemon /system/bin/su_daemon
+	adb push client/client /system/bin/
+
 %.o: %.c
 	gcc -c $< -o $@
 clean:

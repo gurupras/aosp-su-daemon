@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/google/shlex"
@@ -13,7 +16,7 @@ import (
 var (
 	UnixSocketPath = "/dev/socket/su_daemon"
 	LogPath        = "/dev/kmsg"
-	socket         net.Listener
+	socket         *net.UnixListener
 	log_buf        *bufio.Writer
 )
 
@@ -72,7 +75,7 @@ func init_fn() {
 	if socket != nil {
 		goto log
 	}
-	socket, err = net.Listen("unix", UnixSocketPath)
+	socket, err = net.ListenUnix("unix", &net.UnixAddr{UnixSocketPath, "unix"})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to bind to socket:", err)
 		os.Exit(-1)
@@ -103,7 +106,7 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 	init_fn()
 	switch kingpin.MustParse(app.Parse(args[1:])) {
 	case write_cmd.FullCommand():
-		debug("write %s %s", write_data, write_file)
+		debug("write:", *write_data, *write_file)
 		ret = Write(*write_data, *write_file)
 	case exec_cmd.FullCommand():
 		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
@@ -129,21 +132,60 @@ func process(fd net.Conn) {
 	}
 
 	cmd_bytes := buf[0:nr]
-	cmd := string(cmd_bytes)
+	cmd := strings.TrimSpace(string(cmd_bytes))
 	log("Command: %s", cmd)
-	Main1(cmd)
+	ret, stdout, stderr := Main1(cmd)
+	var retbuf bytes.Buffer
+
+	var total_len uint64
+
+	total_len = 0 +
+		8 /* total */ +
+		4 /* ret */ +
+		8 /* len(stdout) */ +
+		uint64(len(stdout)) /* stdout */ +
+		8 /* len(stderr) */ +
+		uint64(len(stderr)) /* stderr */
+
+	fmt.Println("total_len:", total_len)
+	if err = binary.Write(&retbuf, binary.LittleEndian, total_len); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+	if err = binary.Write(&retbuf, binary.LittleEndian, int32(ret)); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+
+	if err = binary.Write(&retbuf, binary.LittleEndian, uint64(len(stdout))); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+	if _, err = retbuf.WriteString(stdout); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+
+	if err = binary.Write(&retbuf, binary.LittleEndian, uint64(len(stderr))); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+	if _, err = retbuf.WriteString(stderr); err != nil {
+		fmt.Println("Failed to write to bytes.Buffer", err)
+	}
+
+	//fmt.Printf(stdout)
+	//fmt.Printf(stderr)
+
+	n, err := fd.Write(retbuf.Bytes())
+	//fmt.Println("Wrote:", n)
+	fd.Close()
 }
 
 func server() {
 	for {
-		fd, err := socket.Accept()
+		fd, err := socket.AcceptUnix()
 		log("Received connection")
 		if err != nil {
 			log("Failed to accept socket")
 			continue
 		}
-		process(fd)
-		fd.Close()
+		go process(fd)
 	}
 }
 
