@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"testing"
@@ -13,6 +14,7 @@ func init() {
 	var f *os.File
 	var err error
 
+	ShellPath = "/bin/bash"
 	UnixSocketPath = "/tmp/test.sock"
 	// Delete socket if it exists
 	if _, err = os.Stat(UnixSocketPath); err == nil {
@@ -27,7 +29,7 @@ func init() {
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("Could not create log file: %s", LogPath))
 		os.Exit(-1)
 	}
-	defer f.Close()
+	LogBuf = bufio.NewWriter(f)
 	init_fn()
 }
 
@@ -46,7 +48,7 @@ func TestWrite(t *testing.T) {
 	}
 	f.Close()
 	result = testing_base.InitResult("TestWrite-1")
-	if args, err = (shlex.Split("su_daemon write 'hello world' test")); err != nil {
+	if args, err = (shlex.Split("su_daemon -v write 'hello world' test")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
 		goto out
@@ -60,7 +62,7 @@ func TestWrite(t *testing.T) {
 
 	// Out write function cannot create new files. So test this out.
 	result = testing_base.InitResult("TestWrite-2")
-	if args, err = (shlex.Split("su_daemon write 'hello world' /proc/a")); err != nil {
+	if args, err = (shlex.Split("su_daemon -v write 'hello world' /proc/a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
 		goto out
@@ -80,7 +82,7 @@ func TestExec(t *testing.T) {
 	var result string
 
 	result = testing_base.InitResult("TestExec-1")
-	if args, err = (shlex.Split("su_daemon -v exec ls -- -l -i -s -a")); err != nil {
+	if args, err = (shlex.Split("su_daemon -vo exec ls -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
 		goto out
@@ -92,7 +94,40 @@ func TestExec(t *testing.T) {
 	testing_base.HandleResult(t, success, result)
 
 	result = testing_base.InitResult("TestExec-2")
-	if args, err = (shlex.Split("su_daemon exec programmustnotexist -- -l -i -s -a")); err != nil {
+	if args, err = (shlex.Split("su_daemon -vo exec programmustnotexist -- -l -i -s -a")); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		success = false
+		goto out
+	} else {
+		if ret, _, _ := Main(args); ret >= 0 {
+			success = false
+		}
+	}
+out:
+	testing_base.HandleResult(t, success, result)
+}
+
+func TestExecShell(t *testing.T) {
+	var success bool = true
+	var args []string
+	var err error
+	var result string
+
+	_ = "breakpoint"
+	result = testing_base.InitResult("TestExecShell-1")
+	if args, err = (shlex.Split("su_daemon -vso exec ls -- -l -i -s -a")); err != nil {
+		fmt.Println(os.Stderr, err)
+		success = false
+		goto out
+	} else {
+		if ret, _, _ := Main(args); ret < 0 {
+			success = false
+		}
+	}
+	testing_base.HandleResult(t, success, result)
+
+	result = testing_base.InitResult("TestExecShell-2")
+	if args, err = (shlex.Split("su_daemon -vso exec programmustnotexist -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
 		goto out

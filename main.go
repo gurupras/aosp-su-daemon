@@ -14,14 +14,28 @@ import (
 )
 
 var (
+	ShellPath      = "/system/bin/sh"
 	UnixSocketPath = "/dev/socket/su_daemon"
 	LogPath        = "/dev/kmsg"
 	socket         *net.UnixListener
-	log_buf        *bufio.Writer
+	LogBuf         *bufio.Writer
 )
 
 const (
 	TAG = "su_daemon"
+)
+
+var (
+	app           *kingpin.Application
+	verbose       *bool
+	output        *bool
+	write_cmd     *kingpin.CmdClause
+	write_data    *string
+	write_file    *string
+	exec_cmd      *kingpin.CmdClause
+	exec_cmd_bin  *string
+	exec_cmd_args *[]string
+	exec_shell    *bool
 )
 
 type nargs []string
@@ -45,24 +59,30 @@ func NArgs(s kingpin.Settings) (target *[]string) {
 	return
 }
 
-var (
-	app     = kingpin.New("su-daemon", "An AOSP daemon with su privileges")
+func init_kingpin() {
+	app = kingpin.New("su-daemon", "An AOSP daemon with su privileges")
 	verbose = app.Flag("verbose", "Enable verbose output").Short('v').Default("false").Bool()
-	output  = app.Flag("output", "Print output").Short('o').Default("false").Bool()
+	output = app.Flag("output", "Print output").Short('o').Default("false").Bool()
 
-	write_cmd  = app.Command("write", "Write data to file")
+	write_cmd = app.Command("write", "Write data to file")
 	write_data = write_cmd.Arg("data", "Data to write").Required().String()
 	write_file = write_cmd.Arg("file", "File to write to").Required().String()
 
-	exec_cmd      = app.Command("exec", "Execute a program")
-	exec_cmd_bin  = exec_cmd.Arg("binary", "Binary to execute").Required().String()
+	exec_cmd = app.Command("exec", "Execute a program")
+	exec_cmd_bin = exec_cmd.Arg("binary", "Binary to execute").Required().String()
 	exec_cmd_args = NArgs(exec_cmd.Arg("args", "Arguments to binary"))
-)
+	exec_shell = app.Flag("shell", "Run command in a shell").Short('s').Default("false").Bool()
+}
 
 func debug(a ...interface{}) {
 	if *verbose {
 		fmt.Println(a...)
 	}
+}
+
+func log(msg ...interface{}) {
+	LogBuf.Write([]byte(fmt.Sprintf("%v: %v\n", TAG, msg)))
+	LogBuf.Flush()
 }
 
 func SliceIt(args string) (ret []string) {
@@ -72,6 +92,10 @@ func SliceIt(args string) (ret []string) {
 
 func init_fn() {
 	var err error
+
+	// Initialize kingpin
+	init_kingpin()
+
 	if socket != nil {
 		goto log
 	}
@@ -85,7 +109,7 @@ func init_fn() {
 		os.Exit(-1)
 	}
 log:
-	if log_buf != nil {
+	if LogBuf != nil {
 		return
 	}
 	log_file, err := os.OpenFile(LogPath, os.O_WRONLY, 0)
@@ -93,7 +117,7 @@ log:
 		fmt.Fprintln(os.Stderr, fmt.Sprintf("Failed to open:", LogPath))
 		os.Exit(-1)
 	}
-	log_buf = bufio.NewWriter(log_file)
+	LogBuf = bufio.NewWriter(log_file)
 }
 
 //export Main1
@@ -110,18 +134,13 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 		ret = Write(*write_data, *write_file)
 	case exec_cmd.FullCommand():
 		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
-		ret, stdout, stderr = Execv(*exec_cmd_bin, *exec_cmd_args)
+		ret, stdout, stderr = Execv(*exec_cmd_bin, *exec_cmd_args, *exec_shell)
 	}
 	if *output {
 		log(stdout)
 		log(stderr)
 	}
 	return
-}
-
-func log(msg ...interface{}) {
-	log_buf.Write([]byte(fmt.Sprintf("%v: %v\n", TAG, msg)))
-	log_buf.Flush()
 }
 
 func process(fd net.Conn) {
@@ -133,7 +152,7 @@ func process(fd net.Conn) {
 
 	cmd_bytes := buf[0:nr]
 	cmd := strings.TrimSpace(string(cmd_bytes))
-	log("Command: %s", cmd)
+	log("cmd_bytes:", cmd)
 	ret, stdout, stderr := Main1(cmd)
 	var retbuf bytes.Buffer
 
@@ -169,11 +188,13 @@ func process(fd net.Conn) {
 		fmt.Println("Failed to write to bytes.Buffer", err)
 	}
 
-	//fmt.Printf(stdout)
-	//fmt.Printf(stderr)
+	debug("retval:", ret)
+	debug("stdout:", stdout)
+	debug("stderr:", stderr)
 
 	n, err := fd.Write(retbuf.Bytes())
-	//fmt.Println("Wrote:", n)
+	_ = n
+	debug("Wrote:", n)
 	fd.Close()
 }
 
