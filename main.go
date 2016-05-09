@@ -128,7 +128,13 @@ func Main1(command string) (ret int, stdout string, stderr string) {
 
 func Main(args []string) (ret int, stdout string, stderr string) {
 	init_fn()
-	switch kingpin.MustParse(app.Parse(args[1:])) {
+	cmd, err := app.Parse(args[1:])
+	if err != nil {
+		ret = -1
+		stderr = err.Error()
+		goto out
+	}
+	switch kingpin.MustParse(cmd, err) {
 	case write_cmd.FullCommand():
 		debug("write:", *write_data, *write_file)
 		ret = Write(*write_data, *write_file)
@@ -140,6 +146,7 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 		log(stdout)
 		log(stderr)
 	}
+out:
 	return
 }
 
