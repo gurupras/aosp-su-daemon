@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/google/shlex"
 )
@@ -60,6 +61,7 @@ func Execv(cmd string, args []string, shell bool) (ret int, stdout string, stder
 	log("cmd_string", cmd_string)
 
 	command = exec.Command(cmd, args...)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	command.Stdout = &buf_stdout
 	command.Stderr = &buf_stderr
