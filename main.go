@@ -10,11 +10,10 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kingpin"
-	"github.com/google/shlex"
+	"github.com/gurupras/gocommons"
 )
 
 var (
-	ShellPath      = "/system/bin/sh"
 	UnixSocketPath = "/dev/socket/su_daemon"
 	LogPath        = "/dev/kmsg"
 	socket         *net.UnixListener
@@ -85,9 +84,8 @@ func log(msg ...interface{}) {
 	LogBuf.Flush()
 }
 
-func SliceIt(args string) (ret []string) {
-	ret, _ = shlex.Split(args)
-	return
+func init() {
+	gocommons.ShellPath = "/system/bin/sh"
 }
 
 func init_fn() {
@@ -122,7 +120,7 @@ log:
 
 //export Main1
 func Main1(command string) (ret int, stdout string, stderr string) {
-	args := SliceIt(command)
+	args := gocommons.SliceArgs(command)
 	return Main(args)
 }
 
@@ -140,7 +138,7 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 		ret = Write(*write_data, *write_file)
 	case exec_cmd.FullCommand():
 		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
-		ret, stdout, stderr = Execv(*exec_cmd_bin, *exec_cmd_args, *exec_shell)
+		ret, stdout, stderr = gocommons.Execv(*exec_cmd_bin, *exec_cmd_args, *exec_shell)
 	}
 	if *output {
 		log(stdout)

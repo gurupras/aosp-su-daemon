@@ -2,14 +2,8 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
-	"syscall"
-
-	"github.com/google/shlex"
 )
 
 //export Write
@@ -33,50 +27,4 @@ func Write(data, file string) (ret int) {
 		return
 	}
 	return
-}
-
-//export Execv
-func Execv(cmd string, args []string, shell bool) (ret int, stdout string, stderr string) {
-	var buf_stdout, buf_stderr bytes.Buffer
-	var err error
-	var command *exec.Cmd
-
-	if shell == true {
-		args = append([]string{cmd}, args...)
-		argstring := "-c '" + strings.Join(args, " ") + "'"
-		args, err = shlex.Split(argstring)
-		cmd = ShellPath
-	}
-
-	// Create a string to log for the command that we're running
-	var cmd_string string = cmd + " "
-	for i, arg := range args {
-		cmd_string += arg
-		if i != len(args)-1 {
-			cmd_string += " "
-		}
-	}
-	log("cmd: ", cmd)
-	log("args:", args)
-	log("cmd_string", cmd_string)
-
-	command = exec.Command(cmd, args...)
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	command.Stdout = &buf_stdout
-	command.Stderr = &buf_stderr
-	if err = command.Run(); err != nil {
-		ret = -1
-	} else {
-		ret = 0
-	}
-	stdout = buf_stdout.String()
-	stderr = buf_stderr.String()
-
-	return
-}
-
-//export Execv1
-func Execv1(cmd string, args string, shell bool) (ret int, stdout string, stderr string) {
-	return Execv(cmd, SliceIt(args), shell)
 }

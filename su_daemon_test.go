@@ -7,14 +7,13 @@ import (
 	"testing"
 
 	"github.com/flynn-archive/go-shlex"
-	"github.com/gurupras/testing_base"
+	"github.com/gurupras/gocommons"
 )
 
 func init() {
 	var f *os.File
 	var err error
 
-	ShellPath = "/bin/bash"
 	UnixSocketPath = "/tmp/test.sock"
 	// Delete socket if it exists
 	if _, err = os.Stat(UnixSocketPath); err == nil {
@@ -31,6 +30,7 @@ func init() {
 	}
 	LogBuf = bufio.NewWriter(f)
 	init_fn()
+	gocommons.ShellPath = "/bin/bash"
 }
 
 func TestWrite(t *testing.T) {
@@ -47,7 +47,7 @@ func TestWrite(t *testing.T) {
 		goto out
 	}
 	f.Close()
-	result = testing_base.InitResult("TestWrite-1")
+	result = gocommons.InitResult("TestWrite-1")
 	if args, err = (shlex.Split("su_daemon -v write 'hello world' test")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
@@ -58,10 +58,10 @@ func TestWrite(t *testing.T) {
 		}
 	}
 	os.Remove("test")
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 
 	// Out write function cannot create new files. So test this out.
-	result = testing_base.InitResult("TestWrite-2")
+	result = gocommons.InitResult("TestWrite-2")
 	if args, err = (shlex.Split("su_daemon -v write 'hello world' /proc/a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
@@ -72,7 +72,7 @@ func TestWrite(t *testing.T) {
 		}
 	}
 out:
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 }
 
 func TestExec(t *testing.T) {
@@ -81,7 +81,7 @@ func TestExec(t *testing.T) {
 	var err error
 	var result string
 
-	result = testing_base.InitResult("TestExec-1")
+	result = gocommons.InitResult("TestExec-1")
 	if args, err = (shlex.Split("su_daemon -vo exec ls -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
@@ -91,9 +91,9 @@ func TestExec(t *testing.T) {
 			success = false
 		}
 	}
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 
-	result = testing_base.InitResult("TestExec-2")
+	result = gocommons.InitResult("TestExec-2")
 	if args, err = (shlex.Split("su_daemon -vo exec programmustnotexist -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
@@ -104,7 +104,7 @@ func TestExec(t *testing.T) {
 		}
 	}
 out:
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 }
 
 func TestExecShell(t *testing.T) {
@@ -114,7 +114,7 @@ func TestExecShell(t *testing.T) {
 	var result string
 
 	_ = "breakpoint"
-	result = testing_base.InitResult("TestExecShell-1")
+	result = gocommons.InitResult("TestExecShell-1")
 	if args, err = (shlex.Split("su_daemon -vso exec ls -- -l -i -s -a")); err != nil {
 		fmt.Println(os.Stderr, err)
 		success = false
@@ -124,9 +124,9 @@ func TestExecShell(t *testing.T) {
 			success = false
 		}
 	}
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 
-	result = testing_base.InitResult("TestExecShell-2")
+	result = gocommons.InitResult("TestExecShell-2")
 	if args, err = (shlex.Split("su_daemon -vso exec programmustnotexist -- -l -i -s -a")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		success = false
@@ -137,5 +137,5 @@ func TestExecShell(t *testing.T) {
 		}
 	}
 out:
-	testing_base.HandleResult(t, success, result)
+	gocommons.HandleResult(t, success, result)
 }
