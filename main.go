@@ -28,6 +28,8 @@ var (
 	app           *kingpin.Application
 	verbose       *bool
 	output        *bool
+	read_cmd      *kingpin.CmdClause
+	read_file     *string
 	write_cmd     *kingpin.CmdClause
 	write_data    *string
 	write_file    *string
@@ -66,6 +68,9 @@ func init_kingpin() {
 	write_cmd = app.Command("write", "Write data to file")
 	write_data = write_cmd.Arg("data", "Data to write").Required().String()
 	write_file = write_cmd.Arg("file", "File to write to").Required().String()
+
+	read_cmd = app.Command("read", "Read data from file")
+	read_file = read_cmd.Arg("file", "File to read from").Required().String()
 
 	exec_cmd = app.Command("exec", "Execute a program")
 	exec_cmd_bin = exec_cmd.Arg("binary", "Binary to execute").Required().String()
@@ -135,10 +140,13 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 	switch kingpin.MustParse(cmd, err) {
 	case write_cmd.FullCommand():
 		debug("write:", *write_data, *write_file)
-		ret = Write(*write_data, *write_file)
+		ret, stdout, stderr = Write(*write_data, *write_file)
 	case exec_cmd.FullCommand():
 		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
 		ret, stdout, stderr = gocommons.Execv(*exec_cmd_bin, *exec_cmd_args, *exec_shell)
+	case read_cmd.FullCommand():
+		debug("read:", *read_file)
+		ret, stdout, stderr = Read(*read_file)
 	}
 	if *output {
 		log(stdout)
