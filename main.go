@@ -179,7 +179,7 @@ func process(fd net.Conn) {
 		8 /* len(stderr) */ +
 		uint64(len(stderr)) /* stderr */
 
-	fmt.Println("total_len:", total_len)
+	debug("total_len:", total_len)
 	if err = binary.Write(&retbuf, binary.LittleEndian, total_len); err != nil {
 		fmt.Println("Failed to write to bytes.Buffer", err)
 	}
