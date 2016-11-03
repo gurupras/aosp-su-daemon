@@ -15,7 +15,7 @@ import (
 
 var (
 	UnixSocketPath = "/dev/socket/su_daemon"
-	LogPath        = "/dev/kmsg"
+	LogPath        = "/sys/kernel/debug/tracing/trace_marker"
 	socket         *net.UnixListener
 	LogBuf         *bufio.Writer
 )
