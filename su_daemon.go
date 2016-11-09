@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/gurupras/gocommons"
 )
 
 //export Write
@@ -55,4 +57,16 @@ func Read(file string) (ret int, stdout string, stderr string) {
 	}
 	stdout = strings.TrimSpace(buf.String())
 	return
+}
+
+//export RunUiAutomator
+func RunUiAutomator(jarPath, jarMethod, extras string) (err error) {
+	cmd := "/system/bin/uiautomator"
+	args := fmt.Sprintf("runtest %s %s -c %s", jarPath, extras, jarMethod)
+	log(fmt.Sprintf("%s %s", cmd, args))
+	ret, stdout, stderr := gocommons.Execv1(cmd, args, true)
+	_ = ret
+	_ = stdout
+	_ = stderr
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kingpin"
+	"github.com/google/shlex"
 	"github.com/gurupras/gocommons"
 )
 
@@ -37,6 +38,13 @@ var (
 	exec_cmd_bin  *string
 	exec_cmd_args *[]string
 	exec_shell    *bool
+
+	exec1_cmd      *kingpin.CmdClause
+	exec1_cmd_args *[]string
+
+	uiautomator_cmd    *kingpin.CmdClause
+	uiautomator_app    *string
+	uiautomator_extras *string
 )
 
 type nargs []string
@@ -76,6 +84,13 @@ func init_kingpin() {
 	exec_cmd_bin = exec_cmd.Arg("binary", "Binary to execute").Required().String()
 	exec_cmd_args = NArgs(exec_cmd.Arg("args", "Arguments to binary"))
 	exec_shell = app.Flag("shell", "Run command in a shell").Short('s').Default("false").Bool()
+
+	exec1_cmd = app.Command("exec1", "Execute a program")
+	exec1_cmd_args = NArgs(exec1_cmd.Arg("args", "Arguments to binary"))
+
+	uiautomator_cmd = app.Command("uiautomator", "Run uiautomator")
+	uiautomator_app = uiautomator_cmd.Arg("app", "Application to run").Required().String()
+	uiautomator_extras = uiautomator_cmd.Flag("extras", "Extras to pass on. Format: key=val").Short('e').String()
 }
 
 func debug(a ...interface{}) {
@@ -144,9 +159,23 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 	case exec_cmd.FullCommand():
 		debug("exec:", *exec_cmd_bin, *exec_cmd_args)
 		ret, stdout, stderr = gocommons.Execv(*exec_cmd_bin, *exec_cmd_args, *exec_shell)
+	case exec1_cmd.FullCommand():
+		cmd := (*exec1_cmd_args)[0]
+		args := strings.Join((*exec1_cmd_args)[1:], " ")
+		ret, stdout, stderr = gocommons.Execv1(cmd, args, *exec_shell)
 	case read_cmd.FullCommand():
 		debug("read:", *read_file)
 		ret, stdout, stderr = Read(*read_file)
+	case uiautomator_cmd.FullCommand():
+		app := *uiautomator_app
+		extras, _ := ParseExtras(*uiautomator_extras)
+		switch app {
+		case "antutu":
+			jarPath := "/system/bin/workloads/com.arm.wlauto.uiauto.antutu.jar"
+			jarMethod := "com.arm.wlauto.uiauto.antutu.UiAutomation#runUiAutomation"
+			extras += " -e workdir \"/sdcard/wa-working\""
+			RunUiAutomator(jarPath, jarMethod, extras)
+		}
 	}
 	if *output {
 		log(stdout)
@@ -154,6 +183,26 @@ func Main(args []string) (ret int, stdout string, stderr string) {
 	}
 out:
 	return
+}
+
+func ParseExtras(extra string) (string, error) {
+	var extras []string
+	var err error
+	if extras, err = shlex.Split(extra); err != nil {
+		return "", err
+	}
+
+	finalExtras := make([]string, 0)
+	for _, e := range extras {
+		tokens := strings.Split(e, "=")
+		if len(tokens) != 2 {
+			log("Failed to parse:", e)
+			continue
+		}
+		fmtExtra := fmt.Sprintf("-e %v %v", tokens[0], tokens[1])
+		finalExtras = append(finalExtras, fmtExtra)
+	}
+	return strings.Join(finalExtras, " "), err
 }
 
 func process(fd net.Conn) {
