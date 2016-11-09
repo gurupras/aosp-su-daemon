@@ -25,8 +25,10 @@ phone: GOARCH=arm
 phone:
 	go build
 	cd client && go build
+	cd echo && go build
 	adb push aosp_su_daemon /system/bin/su_daemon
 	adb push client/client /system/bin/
+	adb push echo/echo /system/bin
 
 %.o: %.c
 	gcc -c $< -o $@
